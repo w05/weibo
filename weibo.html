@@ -1,0 +1,191 @@
+﻿<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>智能课堂 —— 微博ajax接口测试 - www.zhinengshe.com</title>
+    <link href="style/weibo.css" rel="stylesheet" type="text/css"/>
+    <style>
+        [v-cloak] {
+            display: none;
+        }
+    </style>
+    <script src="./vue.js"></script>
+    <script src="./vue-resource.js"></script>
+    <script>
+        window.onload = function () {
+            var URL = 'weibo.php'
+            new Vue({
+                el: '.znsArea',
+                data: {
+                    t1: '',
+                    msgData: [],
+                    totalPage: '',
+                    ind: window.location.hash.substring(1) || 1,
+
+                },
+                methods: {
+                    add: function () {
+                        this.$http({
+                            url: URL,
+                            data: {
+                                act: 'add',
+                                content: this.t1
+                            }
+                        }).then(function (res) {
+                            var json = res.data;
+                            this.msgData.push({
+                                content: this.t1,
+                                time: json.time,
+                                acc: 0,
+                                ref: 0,
+                                id: json.id
+                            })
+                            this.t1 = '';
+                            if (this.msgData.length > 6) {
+                                this.msgData.splice(6, 1);
+                            }
+                            //点击添加跳到第一页
+                            this.getPageData(1);
+                            this.getPageCount();
+                            window.location.hash = 1;
+                        })
+                    },
+                    getPageData: function (n) {
+                        this.ind = n;
+                        window.location.hash = n;
+                        this.$http({
+                            url: URL,
+                            data: {
+                                act: 'get',
+                                page: n
+                            }
+                        }).then(function (res) {
+                            var arr = res.data;
+                            arr = eval(arr);
+                            this.msgData = [];
+                            for (var i = 0; i < arr.length; i++) {
+                                this.msgData.push({
+                                    content: arr[i].content,
+                                    time: this.getTimeMsg(arr[i].time),
+                                    acc: arr[i].acc,
+                                    ref: arr[i].ref,
+                                    id: arr[i].id
+                                });
+
+                            }
+
+                        })
+                    },
+                    getPageCount: function () {
+                        this.$http({
+//                            weibo.php?act=get_page_count
+                            url: URL,
+                            data: {
+                                act: 'get_page_count',
+                            }
+                        }).then(function (res) {
+                            this.totalPage = eval(res.data);
+
+                        })
+                    },
+                    up: function (id, acc) {
+//                        weibo.php?act=acc&id=12			顶某一条数据
+                        this.$http({
+                            url: URL,
+                            data: {
+                                act: 'acc',
+                                id: id
+                            }
+                        }).then(function () {
+                            acc++;
+                            this.getPageData(this.ind);
+                        })
+
+                    },
+                    down: function (id, ref) {
+//                        weibo.php?act=ref&id=12			顶某一条数据
+                        this.$http({
+                            url: URL,
+                            data: {
+                                act: 'ref',
+                                id: id
+                            }
+                        }).then(function () {
+                            ref++;
+                            this.getPageData(this.ind);
+                        })
+
+                    },
+                    del: function (id, num) {
+//                        weibo.php?act=del&id=12
+                        this.$http({
+                            url: URL,
+                            data: {
+                                act: 'del',
+                                id: id
+                            }
+                        }).then(function () {
+                            this.msgData.splice(num, 1);
+                            this.getPageData(this.ind);
+                            this.getPageCount();
+                        })
+                    },
+                    getTimeMsg: function (time) {
+
+                        time = new Date(time * 1000);
+
+                        var year = time.getFullYear();
+                        var month = time.getMonth() + 1;
+                        var day = time.getDate();
+                        var hour = time.getHours();
+                        var min = time.getMinutes();
+                        var sec = time.getSeconds();
+                        if (hour < 10) hour = '0' + hour;
+                        if (min < 10) min = '0' + min;
+                        if (sec < 10) sec = '0' + sec;
+                        var timeMsg = year + '-' + month + '-' + day + ' ' + hour + ':' + min + ':' + sec;
+                        return timeMsg;
+                    }
+                },
+                ready: function () {
+                    this.getPageData(this.ind);
+                    this.getPageCount();
+                }
+            })
+        };
+    </script>
+</head>
+
+<body>
+<div class="znsArea">
+    <!--留言-->
+    <div class="takeComment">
+        <textarea name="textarea" class="takeTextField" id="tijiaoText" v-model="t1" @keydown.enter = "add()"></textarea>
+        <div class="takeSbmComment">
+            <input type="button" class="inputs" value="" @click="add()"/>
+            <span>(可按 Enter 回复)</span>
+        </div>
+    </div>
+    <!--已留-->
+    <div class="commentOn">
+        <div class="noContent" v-show="msgData.length==0">暂无留言</div>
+        <div class="messList">
+            <div class="reply" v-for="item in msgData" v-cloak>
+                <p class="replyContent">{{item.content}}</p>
+                <p class="operation">
+                    <span class="replyTime">{{item.time}}</span>
+                    <span class="handle">
+                    	<a href="javascript:;" class="top" @click="up(item.id,item.acc)">{{item.acc}}</a>
+                        <a href="javascript:;" class="down_icon" @click="down(item.id,item.ref)">{{item.ref}}</a>
+                        <a href="javascript:;" class="cut" @click="del(item.id,$index)">删除</a>
+                    </span>
+                </p>
+            </div>
+        </div>
+        <div class="page" v-cloak>
+            <a href="javascript:;" v-for="n  in  totalPage" @click="getPageData(n+1)" :class="{'active':ind == n+1}">{{n+1}}</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>
